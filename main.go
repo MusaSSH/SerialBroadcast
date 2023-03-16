@@ -76,21 +76,14 @@ func serialRead(port serial.Port) {
 		read = bytes.Trim(read, "\x00")
 		buff.Write(read)
 
-		var messages []string
 		for {
-			s, err := buff.ReadString('\n')
+			b, err := buff.ReadBytes('\n')
 			if err == io.EOF {
 				buff.Reset()
-				buff.Write([]byte(s))
+				buff.Write(b)
 				break
 			}
-			messages = append(messages, s)
-		}
-
-		if len(messages) > 0 {
-			for _, m := range messages {
-				fmt.Println("Message:", m)
-			}
+			fmt.Print(string(b))
 		}
 	}
 }
