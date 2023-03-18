@@ -2,6 +2,7 @@ package serialhandle
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -16,8 +17,8 @@ type SerialPort struct {
 	buff bytes.Buffer
 }
 
-func (s SerialPort) read() {
-	for {
+func (s SerialPort) read(c context.Context) {
+	for c.Err() == nil {
 		read := make([]byte, 128)
 		_, err := s.port.Read(read)
 		if err != nil {
@@ -38,25 +39,33 @@ func (s SerialPort) read() {
 	}
 }
 
-func new(c config.Config) (s SerialPort, err error) {
-	port, err := serial.Open(c.SerialPort, &serial.Mode{
-		BaudRate: c.BaudRate,
-	})
-
-	if err != nil {
-		return s, err
-	}
-	s.port = port
-	return
-}
-
-func start(s SerialPort) {
-	go s.read()
-}
-
 func Build() fx.Option {
-	return fx.Options(
-		fx.Provide(new),
-		fx.Invoke(start),
-	)
+	return fx.Provide(func(lc fx.Lifecycle, c config.Config) (s SerialPort, err error) {
+		port, err := serial.Open(c.SerialPort, &serial.Mode{
+			BaudRate: c.BaudRate,
+		})
+
+		if err != nil {
+			return s, err
+		}
+		s.port = port
+
+		stopc, stop := context.WithCancel(context.Background())
+
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				go s.read(stopc)
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				stop()
+				err := s.port.Close()
+				if err != nil {
+					return err
+				}
+				return nil
+			},
+		})
+		return
+	})
 }

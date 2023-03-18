@@ -22,6 +22,7 @@ func main() {
 	app := fx.New(
 		config.Build(),
 		serialhandle.Build(),
+		fx.Invoke(func(s serialhandle.SerialPort) {}),
 	)
 	if err := app.Start(ctx); err != nil {
 		log.Fatal(err)
