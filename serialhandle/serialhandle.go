@@ -4,18 +4,19 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
 
 	"github.com/MusaSSH/SerialBroadcast/config"
 	"github.com/MusaSSH/SerialBroadcast/message"
 	"go.bug.st/serial"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 type SerialPort struct {
 	port    serial.Port
 	buff    bytes.Buffer
 	message message.Message
+	logger  *zap.Logger
 }
 
 func (s SerialPort) read(c context.Context) {
@@ -23,7 +24,7 @@ func (s SerialPort) read(c context.Context) {
 		read := make([]byte, 128)
 		_, err := s.port.Read(read)
 		if err != nil {
-			log.Println(err)
+			s.logger.Error("Error reading from serial port", zap.Error(err))
 		}
 		read = bytes.Trim(read, "\x00")
 		s.buff.Write(read)
@@ -35,22 +36,30 @@ func (s SerialPort) read(c context.Context) {
 				s.buff.Write(b)
 				break
 			}
-			s.message.Publish(b)
+
+			err = s.message.Publish(b)
+			if err != nil {
+				s.logger.Error("Error publishing message", zap.Error(err))
+			}
 		}
 	}
 }
 
 func Build() fx.Option {
-	return fx.Provide(func(lc fx.Lifecycle, c config.Config, m message.Message) (s SerialPort, err error) {
+	return fx.Provide(func(lc fx.Lifecycle, c config.Config, m message.Message, l *zap.Logger) (SerialPort, error) {
+
 		port, err := serial.Open(c.SerialPort, &serial.Mode{
 			BaudRate: c.BaudRate,
 		})
 
 		if err != nil {
-			return s, err
+			return SerialPort{}, err
 		}
-		s.port = port
-		s.message = m
+		s := SerialPort{
+			logger:  l,
+			message: m,
+			port:    port,
+		}
 
 		sctx, sf := context.WithCancel(context.Background())
 
@@ -68,6 +77,6 @@ func Build() fx.Option {
 				return nil
 			},
 		})
-		return
+		return s, nil
 	})
 }

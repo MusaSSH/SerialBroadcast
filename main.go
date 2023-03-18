@@ -2,16 +2,17 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/MusaSSH/SerialBroadcast/config"
+	"github.com/MusaSSH/SerialBroadcast/logger"
 	"github.com/MusaSSH/SerialBroadcast/message"
 	"github.com/MusaSSH/SerialBroadcast/serialhandle"
 	"github.com/joho/godotenv"
 	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -22,12 +23,14 @@ func main() {
 
 	app := fx.New(
 		config.Build(),
+		logger.Build(),
 		message.Build(),
 		serialhandle.Build(),
 		fx.Invoke(func(s serialhandle.SerialPort) {}),
 	)
+
 	if err := app.Start(ctx); err != nil {
-		log.Fatal(err)
+		zap.L().Fatal("Error starting application", zap.Error(err))
 	}
 
 	<-ctx.Done()
@@ -35,6 +38,6 @@ func main() {
 	defer cf()
 
 	if err := app.Stop(ctx); err != nil {
-		log.Fatal(err)
+		zap.L().Fatal("Error stopping application", zap.Error(err))
 	}
 }
