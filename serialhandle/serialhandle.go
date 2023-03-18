@@ -3,18 +3,19 @@ package serialhandle
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"log"
 
 	"github.com/MusaSSH/SerialBroadcast/config"
+	"github.com/MusaSSH/SerialBroadcast/message"
 	"go.bug.st/serial"
 	"go.uber.org/fx"
 )
 
 type SerialPort struct {
-	port serial.Port
-	buff bytes.Buffer
+	port    serial.Port
+	buff    bytes.Buffer
+	message message.Message
 }
 
 func (s SerialPort) read(c context.Context) {
@@ -34,13 +35,13 @@ func (s SerialPort) read(c context.Context) {
 				s.buff.Write(b)
 				break
 			}
-			fmt.Print(string(b))
+			s.message.Publish(b)
 		}
 	}
 }
 
 func Build() fx.Option {
-	return fx.Provide(func(lc fx.Lifecycle, c config.Config) (s SerialPort, err error) {
+	return fx.Provide(func(lc fx.Lifecycle, c config.Config, m message.Message) (s SerialPort, err error) {
 		port, err := serial.Open(c.SerialPort, &serial.Mode{
 			BaudRate: c.BaudRate,
 		})
@@ -49,16 +50,17 @@ func Build() fx.Option {
 			return s, err
 		}
 		s.port = port
+		s.message = m
 
-		stopc, stop := context.WithCancel(context.Background())
+		sctx, sf := context.WithCancel(context.Background())
 
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				go s.read(stopc)
+				go s.read(sctx)
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				stop()
+				sf()
 				err := s.port.Close()
 				if err != nil {
 					return err

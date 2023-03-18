@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MusaSSH/SerialBroadcast/config"
+	"github.com/MusaSSH/SerialBroadcast/message"
 	"github.com/MusaSSH/SerialBroadcast/serialhandle"
 	"github.com/joho/godotenv"
 	"go.uber.org/fx"
@@ -21,6 +22,7 @@ func main() {
 
 	app := fx.New(
 		config.Build(),
+		message.Build(),
 		serialhandle.Build(),
 		fx.Invoke(func(s serialhandle.SerialPort) {}),
 	)
