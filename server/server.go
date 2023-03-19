@@ -49,7 +49,6 @@ func NewHTTPServer(lc fx.Lifecycle, l *zap.Logger, c config.Config) *http.Server
 	sctx, cf := context.WithCancel(context.Background())
 	lc.Append(fx.Hook{
 		OnStart: func(_ context.Context) error {
-			l.Info("sea")
 			ln, err := net.Listen("tcp", c.WSPort)
 			if err != nil {
 				return err
