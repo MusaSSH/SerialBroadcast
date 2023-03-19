@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/MusaSSH/SerialBroadcast/config"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"nhooyr.io/websocket"
@@ -37,30 +38,41 @@ func (s Server) Broadcast(data []byte) error {
 	return nil
 }
 
-func NewHTTPServer(l *zap.Logger) *http.Server {
-	return &http.Server{
+func NewHTTPServer(lc fx.Lifecycle, l *zap.Logger, c config.Config) *http.Server {
+	srv := &http.Server{
 		Handler: &Server{
 			logger: l,
 			conns:  make(map[*websocket.Conn]bool),
 		},
 	}
-}
 
-func StartHTTPServer(s *http.Server) {
-	l, err := net.Listen("tcp", ":8080")
-	if err != nil {
-		panic(err)
-	}
+	sctx, cf := context.WithCancel(context.Background())
+	lc.Append(fx.Hook{
+		OnStart: func(_ context.Context) error {
+			l.Info("sea")
+			ln, err := net.Listen("tcp", c.WSPort)
+			if err != nil {
+				return err
+			}
 
-	go func() {
-		s.Serve(l)
-	}()
+			srv.BaseContext = func(_ net.Listener) context.Context { return sctx }
 
+			go func() {
+				if err := srv.Serve(ln); err != nil {
+					l.Fatal("Error serving websocket", zap.Error(err))
+				}
+			}()
+
+			return nil
+		},
+		OnStop: func(_ context.Context) error {
+			cf()
+			return nil
+		},
+	})
+	return srv
 }
 
 func Build() fx.Option {
-	return fx.Options(
-		fx.Provide(NewHTTPServer),
-		fx.Invoke(StartHTTPServer),
-	)
+	return fx.Provide(NewHTTPServer)
 }
