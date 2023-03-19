@@ -4,19 +4,20 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"net/http"
 
 	"github.com/MusaSSH/SerialBroadcast/config"
-	"github.com/MusaSSH/SerialBroadcast/message"
+	"github.com/MusaSSH/SerialBroadcast/server"
 	"go.bug.st/serial"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
 
 type SerialPort struct {
-	port    serial.Port
-	buff    bytes.Buffer
-	message message.Message
-	logger  *zap.Logger
+	port   serial.Port
+	buff   bytes.Buffer
+	ws     *http.Server
+	logger *zap.Logger
 }
 
 func (s SerialPort) read(c context.Context) {
@@ -36,17 +37,16 @@ func (s SerialPort) read(c context.Context) {
 				s.buff.Write(b)
 				break
 			}
-
-			err = s.message.Publish(b)
+			err = s.ws.Handler.(*server.Server).Broadcast(b)
 			if err != nil {
-				s.logger.Error("Error publishing message", zap.Error(err))
+				s.logger.Error("Error broadcasting to websocket", zap.Error(err))
 			}
 		}
 	}
 }
 
 func Build() fx.Option {
-	return fx.Provide(func(lc fx.Lifecycle, c config.Config, m message.Message, l *zap.Logger) (SerialPort, error) {
+	return fx.Provide(func(lc fx.Lifecycle, c config.Config, l *zap.Logger, ws *http.Server) (SerialPort, error) {
 
 		port, err := serial.Open(c.SerialPort, &serial.Mode{
 			BaudRate: c.BaudRate,
@@ -56,9 +56,9 @@ func Build() fx.Option {
 			return SerialPort{}, err
 		}
 		s := SerialPort{
-			logger:  l,
-			message: m,
-			port:    port,
+			logger: l,
+			port:   port,
+			ws:     ws,
 		}
 
 		sctx, sf := context.WithCancel(context.Background())
