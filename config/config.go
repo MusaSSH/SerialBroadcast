@@ -8,10 +8,7 @@ import (
 type Config struct {
 	SerialPort string `envconfig:"SERIAL_PORT" required:"true"`
 	BaudRate   int    `envconfig:"BAUD_RATE" default:"9600"`
-
-	AmqpAddr      string `envconfig:"AMQP_ADDR" required:"true"`
-	AmqpTtl       int    `envconfig:"AMQP_TTL" default:"1000"`
-	AmqpQueueName string `envconfig:"AMQP_QUEUE_NAME" default:"serialPort"`
+	WSPort     string `envconfig:"WS_PORT" default:":1234"`
 }
 
 func Build() fx.Option {
