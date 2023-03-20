@@ -3,6 +3,7 @@ module github.com/MusaSSH/SerialBroadcast
 go 1.20
 
 require (
+	github.com/Southclaws/fault v0.5.1
 	github.com/joho/godotenv v1.5.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	go.bug.st/serial v1.5.0
