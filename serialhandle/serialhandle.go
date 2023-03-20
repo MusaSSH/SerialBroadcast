@@ -50,8 +50,8 @@ func (s SerialPort) read(c context.Context) {
 func Build() fx.Option {
 	return fx.Provide(func(lc fx.Lifecycle, c config.Config, l *zap.Logger, ws *http.Server) (SerialPort, error) {
 
-		port, err := serial.Open(c.SerialPort, &serial.Mode{
-			BaudRate: c.BaudRate,
+		port, err := serial.Open(c.SPort, &serial.Mode{
+			BaudRate: c.SBaudRate,
 		})
 
 		if err != nil {
