@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"sync"
 
 	"github.com/MusaSSH/SerialBroadcast/config"
 	"go.uber.org/fx"
@@ -12,6 +13,7 @@ import (
 )
 
 type Server struct {
+	*sync.RWMutex
 	conns  map[*websocket.Conn]bool
 	logger *zap.Logger
 }
@@ -25,13 +27,30 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.Lock()
 	s.conns[c] = true
+	s.Unlock()
+
+	for {
+		_, _, err := c.Read(r.Context())
+		if err != nil {
+			s.Lock()
+			delete(s.conns, c)
+			c.Close(websocket.StatusAbnormalClosure, "")
+			s.Unlock()
+			return
+		}
+	}
 }
 
 func (s Server) Broadcast(data []byte) error {
 	for c := range s.conns {
 		err := c.Write(context.Background(), websocket.MessageText, data)
 		if err != nil {
+			s.Lock()
+			delete(s.conns, c)
+			c.Close(websocket.StatusInternalError, "")
+			s.Unlock()
 			return err
 		}
 	}
@@ -41,8 +60,9 @@ func (s Server) Broadcast(data []byte) error {
 func NewHTTPServer(lc fx.Lifecycle, l *zap.Logger, c config.Config) *http.Server {
 	srv := &http.Server{
 		Handler: &Server{
-			logger: l,
-			conns:  make(map[*websocket.Conn]bool),
+			RWMutex: &sync.RWMutex{},
+			logger:  l,
+			conns:   make(map[*websocket.Conn]bool),
 		},
 	}
 
