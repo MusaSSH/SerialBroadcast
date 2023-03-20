@@ -38,6 +38,7 @@ func (s SerialPort) read(c context.Context) {
 				break
 			}
 			b = b[:len(b)-1]
+			s.logger.Debug("Broadcasting to websocket", zap.ByteString("message", b))
 			go s.ws.Handler.(*server.Server).Broadcast(b)
 			if err != nil {
 				s.logger.Error("Error broadcasting to websocket", zap.Error(err))

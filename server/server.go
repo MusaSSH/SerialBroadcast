@@ -27,6 +27,8 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.logger.Info("Websocket connected", zap.String("remote_addr", r.RemoteAddr))
+
 	s.Lock()
 	s.conns[c] = true
 	s.Unlock()
@@ -38,6 +40,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			delete(s.conns, c)
 			c.Close(websocket.StatusAbnormalClosure, "")
 			s.Unlock()
+			s.logger.Info("Websocket disconnected", zap.String("remote_addr", r.RemoteAddr), zap.Error(err))
 			return
 		}
 	}
@@ -85,6 +88,12 @@ func NewHTTPServer(lc fx.Lifecycle, l *zap.Logger, c config.Config) *http.Server
 			return nil
 		},
 		OnStop: func(_ context.Context) error {
+			srv.Handler.(*Server).Lock()
+			for c := range srv.Handler.(*Server).conns {
+				c.Close(websocket.StatusAbnormalClosure, "")
+				delete(srv.Handler.(*Server).conns, c)
+			}
+			srv.Handler.(*Server).Unlock()
 			cf()
 			return nil
 		},
