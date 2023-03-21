@@ -22,7 +22,7 @@ type SerialPort struct {
 
 func (s SerialPort) read(c context.Context) {
 	for c.Err() == nil {
-		read := make([]byte, 128)
+		read := make([]byte, 256)
 		_, err := s.port.Read(read)
 		if err != nil {
 			s.logger.Error("Error reading from serial port", zap.Error(err))
